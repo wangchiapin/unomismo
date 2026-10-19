@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>井</title>
+<style>
+  :root { --fg: #c9ccd6; --dim: #7c8090; --faint: #4a4d5a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #000; color: var(--fg); }
+  body {
+    font-family: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  .screen {
+    position: fixed; inset: 0;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px 24px 56px;
+    text-align: center;
+  }
+  .screen.active { display: flex; }
+
+  /* ---------- 文字畫面（開場 / 離開） ---------- */
+  .typed { font-size: clamp(20px, 5vw, 28px); line-height: 2.1; letter-spacing: .12em; min-height: 9em; white-space: pre-wrap; }
+  .cursor { display: inline-block; width: .6em; border-bottom: 2px solid var(--fg); margin-left: 2px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .btn {
+    margin-top: 32px; background: none; border: 1px solid var(--faint); color: var(--fg);
+    font: inherit; font-size: 18px; letter-spacing: .3em; padding: 12px 36px; border-radius: 2px;
+    cursor: pointer; opacity: 0; transition: opacity 2s, border-color .3s, color .3s;
+  }
+  .btn.show { opacity: 1; }
+  .btn:hover { border-color: var(--fg); }
+
+  /* ---------- 井裡畫面 ---------- */
+  #hole { justify-content: space-between; padding: 28px 20px 56px; }
+  #timer { font-size: clamp(15px, 4vw, 19px); letter-spacing: .1em; color: var(--dim); font-variant-numeric: tabular-nums; }
+  #stage { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0; gap: 14px; }
+  #art { width: min(88vw, 460px); max-height: 48vh; height: auto; }
+  #thought { min-height: 3.6em; max-width: 22em; font-size: clamp(16px, 4.2vw, 20px); line-height: 1.9; letter-spacing: .1em; color: var(--fg); }
+  #thought.in { animation: fadein 1.6s ease both; }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  #ask { font-size: clamp(16px, 4vw, 19px); letter-spacing: .1em; color: var(--dim); }
+  #choices { margin-top: 14px; display: flex; gap: 18px; justify-content: center; }
+  #choices button {
+    background: none; border: 1px solid var(--faint); color: var(--fg); font: inherit; font-size: 17px;
+    width: 64px; height: 44px; border-radius: 2px; cursor: pointer; transition: border-color .3s;
+  }
+  #choices button:hover { border-color: var(--fg); }
+  #reply { height: 1.8em; margin-top: 8px; font-size: 15px; color: var(--dim); letter-spacing: .12em; opacity: 0; transition: opacity 1.2s; }
+  #reply.show { opacity: 1; }
+  #minor { margin-top: 6px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  #snd, #seeBtn {
+    background: none; border: none; color: var(--faint); font: inherit;
+    font-size: 13px; letter-spacing: .15em; cursor: pointer; padding: 6px 10px; transition: color .3s;
+  }
+  #snd:hover, #snd.on, #seeBtn:hover { color: var(--dim); }
+
+  /* ---------- 看看誰也在井裡 ---------- */
+  #others { position: fixed; inset: 0; z-index: 10; background: #000; display: none; }
+  #others.open { display: block; animation: fadein 1.2s ease both; }
+  #bgSq { position: absolute; inset: 0; overflow: hidden; }
+  #bgSq i {
+    position: absolute; display: block;
+    background: radial-gradient(circle at 50% 40%, #161a28, #07080c);
+    border: 1px solid #171b2b;
+  }
+  #othersCount {
+    position: absolute; top: 22px; left: 0; right: 0; text-align: center;
+    font-size: clamp(15px, 4vw, 19px); letter-spacing: .1em; color: var(--dim);
+  }
+  #tiles { position: absolute; left: 16px; right: 16px; top: 64px; bottom: 156px; }
+  .tile { position: absolute; background: #000; border: 1px solid rgba(89,98,124,.42); overflow: hidden; }
+  .tile.me { border-color: rgba(201,204,214,.75); box-shadow: 0 0 16px rgba(160,170,200,.28); }
+  .tile svg { display: block; width: 100%; height: 100%; }
+  .tile .pose { opacity: 0; transition: opacity 2s ease; }
+  .tile .pose.on { opacity: 1; }
+  #othersDeep {
+    position: absolute; left: 0; right: 0; bottom: 118px; text-align: center;
+    font-size: 14px; letter-spacing: .12em; color: var(--dim);
+  }
+  #backBtn {
+    position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%);
+    background: none; border: 1px solid var(--faint); color: var(--fg); font: inherit;
+    font-size: 16px; letter-spacing: .25em; padding: 9px 26px; border-radius: 2px; cursor: pointer;
+    transition: border-color .3s;
+  }
+  #backBtn:hover { border-color: var(--fg); }
+
+  /* 小孩姿勢：淡入淡出切換、輕微呼吸；微光緩慢起伏 */
+  #art .pose { opacity: 0; transition: opacity 2.5s ease; transform-origin: 50% 100%; }
+  #art .pose.on { opacity: 1; animation: breathe 6s ease-in-out infinite; }
+  @keyframes breathe { 50% { transform: scaleY(1.012); } }
+  #glow { animation: pulse 9s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+  .dust { animation: drift 14s linear infinite; }
+  @keyframes drift { from { transform: translateY(0); opacity: 0; } 20% { opacity: .7; } to { transform: translateY(-60px); opacity: 0; } }
+
+  #care {
+    position: fixed; left: 0; right: 0; bottom: 14px; text-align: center;
+    font-size: 11px; letter-spacing: .15em; color: var(--faint); pointer-events: none;
+    padding: 0 16px; z-index: 20; line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+
+<!-- 1. 開場 -->
+<section id="intro" class="screen">
+  <div id="introText" class="typed"></div>
+  <button id="enterBtn" class="btn">進 入</button>
+</section>
+
+<!-- 2. 井裡 -->
+<section id="hole" class="screen">
+  <div id="timer">你已經進入井裡 0天0小時0分0秒</div>
+  <div id="stage">
+    <svg id="art" viewBox="0 0 400 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="一個小孩坐在漆黑的地方">
+      <defs>
+        <radialGradient id="g1" cx="50%" cy="46%" r="52%">
+          <stop offset="0%" stop-color="#3a4258" stop-opacity=".75"/>
+          <stop offset="45%" stop-color="#171b27" stop-opacity=".45"/>
+          <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="g2" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#262b3b" stop-opacity=".9"/>
+          <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="400" height="320" fill="#000"/>
+      <ellipse id="glow" cx="200" cy="190" rx="190" ry="150" fill="url(#g1)"/>
+      <ellipse cx="200" cy="268" rx="130" ry="16" fill="url(#g2)"/>
+      <defs>
+        <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#8a93ad" stop-opacity=".22"/>
+          <stop offset="100%" stop-color="#8a93ad" stop-opacity="0"/>
+        </linearGradient>
+        <!-- 向左坐（抱膝）；向右坐用鏡射 -->
+        <g id="sitL" fill="#07080c" stroke="#59627c" stroke-opacity=".35" stroke-width="1.2">
+          <path d="M212 172 C 244 186, 254 238, 248 268 L 150 268 C 148 246, 160 214, 188 192 Z"/>
+          <path d="M150 268 C 140 240, 152 208, 180 202 C 200 198, 216 208, 228 228 L 248 268 Z" fill="#05060a"/>
+          <path d="M206 186 C 192 198, 178 210, 176 232" fill="none" stroke="#10131b" stroke-opacity="1" stroke-width="9" stroke-linecap="round"/>
+          <circle cx="190" cy="152" r="27"/>
+        </g>
+      </defs>
+
+      <!-- 1 向左坐 -->
+      <g class="pose" data-pose="sitL"><use href="#sitL"/></g>
+      <!-- 2 向右坐 -->
+      <g class="pose" data-pose="sitR"><use href="#sitL" transform="translate(400 0) scale(-1 1)"/></g>
+      <!-- 3 正面坐（抱膝） -->
+      <g class="pose" data-pose="sitFront" fill="#07080c" stroke="#59627c" stroke-opacity=".35" stroke-width="1.2">
+        <path d="M166 266 C 164 218, 176 194, 200 194 C 224 194, 236 218, 234 266 Z"/>
+        <circle cx="200" cy="176" r="22"/>
+        <path d="M168 268 C 160 240, 172 214, 190 214 C 197 232, 197 252, 193 268 Z" fill="#05060a"/>
+        <path d="M232 268 C 240 240, 228 214, 210 214 C 203 232, 203 252, 207 268 Z" fill="#05060a"/>
+        <path d="M172 204 C 160 230, 172 252, 200 254 C 228 252, 240 230, 228 204" fill="none" stroke="#10131b" stroke-opacity="1" stroke-width="8" stroke-linecap="round"/>
+      </g>
+      <!-- 4 正面亞洲蹲 -->
+      <g class="pose" data-pose="squat" fill="#07080c" stroke="#59627c" stroke-opacity=".35" stroke-width="1.2">
+        <path d="M178 254 C 168 216, 176 190, 200 188 C 224 190, 232 216, 222 254 Z"/>
+        <circle cx="200" cy="168" r="22"/>
+        <path d="M162 267 L 146 220 C 143 206, 160 203, 166 214 L 192 250 L 188 264 Z" fill="#05060a"/>
+        <path d="M238 267 L 254 220 C 257 206, 240 203, 234 214 L 208 250 L 212 264 Z" fill="#05060a"/>
+        <ellipse cx="164" cy="267" rx="15" ry="4"/>
+        <ellipse cx="236" cy="267" rx="15" ry="4"/>
+        <path d="M180 202 C 164 206, 154 214, 154 224 M220 202 C 236 206, 246 214, 246 224" fill="none" stroke="#10131b" stroke-opacity="1" stroke-width="8" stroke-linecap="round"/>
+      </g>
+      <!-- 5 站著抬頭看上面 -->
+      <g class="pose" data-pose="standUp" fill="#07080c" stroke="#59627c" stroke-opacity=".35" stroke-width="1.2">
+        <path d="M232 0 L316 0 L228 130 Z" fill="url(#beam)" stroke="none"/>
+        <path d="M184 268 L187 208 L200 208 L199 268 Z"/>
+        <path d="M202 268 L202 208 L215 208 L214 268 Z"/>
+        <path d="M183 212 C 180 182, 190 160, 206 158 C 224 160, 232 182, 218 212 Z"/>
+        <path d="M188 170 L 182 218" fill="none" stroke="#10131b" stroke-opacity="1" stroke-width="7" stroke-linecap="round"/>
+        <path d="M205 162 L 211 148" fill="none" stroke="#07080c" stroke-opacity="1" stroke-width="9" stroke-linecap="round"/>
+        <circle cx="216" cy="138" r="19"/>
+      </g>
+      <!-- 6 躺著看上面 -->
+      <g class="pose" data-pose="lying" fill="#07080c" stroke="#59627c" stroke-opacity=".35" stroke-width="1.2">
+        <path d="M154 268 L154 246 C 190 238, 250 240, 276 252 L 276 268 Z"/>
+        <circle cx="138" cy="252" r="17"/>
+        <path d="M268 254 L 296 224 L 326 266" fill="none" stroke="#59627c" stroke-opacity=".3" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M268 254 L 296 224 L 326 266" fill="none" stroke="#07080c" stroke-opacity="1" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M170 250 C 196 242, 216 248, 226 256" fill="none" stroke="#10131b" stroke-opacity="1" stroke-width="7" stroke-linecap="round"/>
+      </g>
+      <!-- 7 背對著坐 -->
+      <g class="pose" data-pose="back" fill="#07080c" stroke="#59627c" stroke-opacity=".35" stroke-width="1.2">
+        <path d="M160 268 C 160 224, 172 198, 200 196 C 228 198, 240 224, 240 268 Z"/>
+        <circle cx="200" cy="176" r="21"/>
+        <path d="M168 270 C 176 276, 224 276, 232 270" fill="none" stroke="#10131b" stroke-opacity="1" stroke-width="6" stroke-linecap="round"/>
+      </g>
+
+      <defs>
+        <linearGradient id="shaft" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#d5dcef" stop-opacity=".46"/>
+          <stop offset="100%" stop-color="#d5dcef" stop-opacity=".12"/>
+        </linearGradient>
+        <radialGradient id="pool" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#d5dcef" stop-opacity=".34"/>
+          <stop offset="100%" stop-color="#d5dcef" stop-opacity="0"/>
+        </radialGradient>
+        <!-- 從右上照下來的一道光（鏡射後變成左上） -->
+        <g id="shaftR">
+          <polygon points="210,0 330,0 250,268 130,268" fill="url(#shaft)"/>
+          <ellipse cx="190" cy="268" rx="100" ry="13" fill="url(#pool)"/>
+        </g>
+        <!-- 站著抬頭看（面向右上） -->
+        <g id="standFig" fill="#07080c" stroke="#59627c" stroke-opacity=".35" stroke-width="1.2">
+          <path d="M184 268 L187 208 L200 208 L199 268 Z"/>
+          <path d="M202 268 L202 208 L215 208 L214 268 Z"/>
+          <path d="M183 212 C 180 182, 190 160, 206 158 C 224 160, 232 182, 218 212 Z"/>
+          <path d="M188 170 L 182 218" fill="none" stroke="#10131b" stroke-opacity="1" stroke-width="7" stroke-linecap="round"/>
+          <path d="M205 162 L 211 148" fill="none" stroke="#07080c" stroke-opacity="1" stroke-width="9" stroke-linecap="round"/>
+          <circle cx="216" cy="138" r="19"/>
+        </g>
+      </defs>
+      <!-- 8 坐著（向左），光從左上照下 -->
+      <g class="pose" data-pose="lightSitL" data-light="1">
+        <use href="#shaftR" transform="translate(400 0) scale(-1 1)"/>
+        <use href="#sitL"/>
+      </g>
+      <!-- 9 坐著（向右），光從右上照下 -->
+      <g class="pose" data-pose="lightSitR" data-light="1">
+        <use href="#shaftR"/>
+        <use href="#sitL" transform="translate(400 0) scale(-1 1)"/>
+      </g>
+      <!-- 10 站著抬頭，光從左上照下 -->
+      <g class="pose" data-pose="lightStandL" data-light="1">
+        <use href="#shaftR" transform="translate(400 0) scale(-1 1)"/>
+        <use href="#standFig" transform="translate(400 0) scale(-1 1)"/>
+      </g>
+      <!-- 11 站著抬頭，光從右上照下 -->
+      <g class="pose" data-pose="lightStandR" data-light="1">
+        <use href="#shaftR"/>
+        <use href="#standFig"/>
+      </g>
+      <g fill="#8a93ad">
+        <circle class="dust" cx="80" cy="250" r="1.2" style="animation-delay:0s"/>
+        <circle class="dust" cx="130" cy="280" r="1" style="animation-delay:3s"/>
+        <circle class="dust" cx="290" cy="260" r="1.3" style="animation-delay:6s"/>
+        <circle class="dust" cx="330" cy="290" r="1" style="animation-delay:9s"/>
+        <circle class="dust" cx="240" cy="285" r="1.1" style="animation-delay:11s"/>
+      </g>
+    </svg>
+    <div id="thought"></div>
+  </div>
+  <div>
+    <div id="ask">你想要離開了嗎？（Y/N）</div>
+    <div id="choices">
+      <button id="yBtn" aria-label="Y 離開">Y</button>
+      <button id="nBtn" aria-label="N 留下">N</button>
+    </div>
+    <div id="reply"></div>
+    <div id="minor">
+      <button id="seeBtn" type="button" hidden>看看誰也在井裡…</button>
+      <button id="snd" type="button" aria-label="開關環境聲">聲音：關</button>
+    </div>
+  </div>
+</section>
+
+<!-- 3. 離開 -->
+<section id="leave" class="screen">
+  <div id="leaveText" class="typed"></div>
+  <button id="againBtn" class="btn">繼續回到井裡…</button>
+</section>
+
+<!-- 4. 看看誰也在井裡（蓋在井裡畫面上面；井裡的計時照常在跑） -->
+<section id="others" aria-label="井裡的其他人">
+  <div id="bgSq"></div>
+  <div id="othersCount"></div>
+  <div id="tiles"></div>
+  <div id="othersDeep"></div>
+  <button id="backBtn" type="button">回到井裡</button>
+</section>
+
+<div id="care">如果心裡太重，找個人說說話吧。<br><span id="careCloud"></span></div>
+
+<script>
+/* ============ 句子庫：60 句（負面/反思 30 + 溫和/出口 30），交錯出現 ============ */
+const NEG = [
+  "今天有點迷路。",
+  "有些話，一直沒有說出口。",
+  "你好像很久沒有好好聽自己說話了。",
+  "心裡有一個地方，一直空著。",
+  "有時候，連累都說不出來。",
+  "你一直在找，可是不確定在找什麼。",
+  "熱鬧散去之後，剩下的是誰？",
+  "有些事情，到現在還放不下。",
+  "你習慣讓別人先，那你呢？",
+  "有時候，你只是假裝沒事。",
+  "這裡很暗，但外面也不總是亮的。",
+  "你有多久沒有真的休息了？",
+  "有些難過，沒有理由，也不需要理由。",
+  "你很努力，只是努力得有點孤單。",
+  "有些人離開了，位置還留著。",
+  "你不知道下一步在哪裡，這也是一種狀態。",
+  "不是每個問題都有答案。",
+  "有時候你覺得自己離每個人都很遠。",
+  "那些沒完成的事，今天可以先放著。",
+  "你常常想，別人眼中的你是誰。",
+  "回頭看，有些路走得很急。",
+  "疲倦的時候，看什麼都是灰灰的。",
+  "有些夜晚特別長。",
+  "你心裡有一個聲音，一直沒人聽見。",
+  "你有多少次，把自己放在最後面？",
+  "有些情緒，你還沒替它們取名字。",
+  "安靜下來，才發現心裡有多吵。",
+  "你有沒有想過，現在最想要的是什麼？",
+  "有些期待，悄悄落空了。",
+  "你記得上一次真心笑出來，是什麼時候嗎？"
+];
+const POS = [
+  "外面的光還在。",
+  "你已經走了很遠。",
+  "慢慢來，沒有人在催你。",
+  "你不需要找到答案，才有資格休息。",
+  "呼吸一下，這一刻是安全的。",
+  "你比自己以為的更溫柔。",
+  "有人其實惦記著你。",
+  "今天的你，已經夠了。",
+  "安靜的時候，也是在長大。",
+  "迷路的人，也在看風景。",
+  "想想今天，有什麼小事讓你微笑？",
+  "你可以在這裡停一下，再出發。",
+  "水杯就在旁邊，喝一口吧。",
+  "井底看見的星星，特別亮。",
+  "你不是一個人在尋找。",
+  "傷口在慢慢癒合，雖然你沒注意。",
+  "找不到自己，也是認識自己的一部分。",
+  "你值得被好好對待，包括被自己。",
+  "明天的陽光，不會問你昨天過得怎樣。",
+  "有些事，等一等，就有答案了。",
+  "你曾經撐過更難的日子。",
+  "想哭的話就哭吧，沒有人會評斷你。",
+  "回去的路一直都在。",
+  "你的存在，本身就有意義。",
+  "打個電話給想念的人吧。",
+  "世界很大，但你的小小角落也很好。",
+  "試著伸個懶腰，感覺一下身體。",
+  "慢慢走，路會自己出現。",
+  "今天的你，值得一碗熱湯。",
+  "你隨時可以出去，這很重要。"
+];
+const SENTENCES = [];
+for (let i = 0; i < 30; i++) { SENTENCES.push(NEG[i]); SENTENCES.push(POS[i]); }
+
+/* 待太久（超過 24 小時）時，改為溫和提醒 */
+const GENTLE = [
+  "你在這裡很久了，要不要出去喝杯水？",
+  "外面可能天亮了，去窗邊看看吧。",
+  "身體也需要你，吃點東西好嗎？",
+  "想回來隨時可以回來，先出去走走吧。"
+];
+
+/* 有光從上面照下來的畫面，台詞固定是這一句 */
+const LIGHT_LINE = "你要上來了嗎？";
+
+/* ============ 工具 ============ */
+const $ = id => document.getElementById(id);
+const KEY = "well.enter";
+const SLOT = 10 * 60 * 1000;
+const DAY = 24 * 3600 * 1000;
+
+function load() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+function save(v) { try { localStorage.setItem(KEY, String(v)); } catch (e) {} }
+function clear() { try { localStorage.removeItem(KEY); } catch (e) {} }
+
+let memStart = null; // localStorage 不可用時的備援
+function getStart() {
+  const v = load();
+  if (v) return Number(v);
+  return memStart;
+}
+
+function fmt(ms) {
+  if (ms < 0) ms = 0;
+  let s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600);  s -= h * 3600;
+  const m = Math.floor(s / 60);    s -= m * 60;
+  return d + "天" + h + "小時" + m + "分" + s + "秒";
+}
+
+function show(id) {
+  document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
+  $(id).classList.add("active");
+}
+
+/* 打字機：可被中途取消 */
+let typeToken = 0;
+function typeLines(el, lines, opts) {
+  opts = opts || {};
+  const speed = opts.speed || 140;
+  const pause = opts.pause || 900;
+  const token = ++typeToken;
+  el.textContent = "";
+  const cur = document.createElement("span");
+  cur.className = "cursor";
+  const text = document.createTextNode("");
+  el.appendChild(text); el.appendChild(cur);
+  return new Promise(resolve => {
+    let li = 0, ci = 0, buf = "";
+    function step() {
+      if (token !== typeToken) return resolve(false);
+      if (li >= lines.length) { cur.remove(); return resolve(true); }
+      const line = lines[li];
+      if (ci < line.length) {
+        buf += line[ci++]; text.nodeValue = buf;
+        setTimeout(step, speed);
+      } else {
+        li++; ci = 0;
+        if (li < lines.length) { buf += "\n"; text.nodeValue = buf; setTimeout(step, pause); }
+        else step();
+      }
+    }
+    setTimeout(step, 600);
+  });
+}
+
+/* ============ 開場 ============ */
+function showIntro() {
+  show("intro");
+  const btn = $("enterBtn");
+  btn.classList.remove("show");
+  typeLines($("introText"), ["你也找不到自己嗎？", "那就進來吧⋯"], { speed: 170, pause: 1400 })
+    .then(ok => { if (ok) setTimeout(() => btn.classList.add("show"), 600); });
+}
+
+$("enterBtn").addEventListener("click", enterHole);
+$("againBtn").addEventListener("click", enterHole);
+
+/* ============ 井裡 ============ */
+let tickId = null, lastSlot = -2, replyTimer = null;
+
+function enterHole() {
+  typeToken++; // 停掉任何打字機
+  let start = getStart();
+  if (!start) { start = Date.now(); save(start); memStart = start; lastSlot = -2; }
+  show("hole");
+  cloudPing(start);
+  startPoses();
+  tick(true);
+  if (!tickId) tickId = setInterval(tick, 1000);
+}
+
+/* ============ 小孩姿勢：隨機、不定時更換 ============ */
+const POSES = Array.from(document.querySelectorAll("#art .pose"));
+let poseNow = -1, poseTimer = null;
+let lightOn = false; // 目前是否是「有光照下來」的姿勢
+function pickPose() {
+  if (!POSES.length) return;
+  // 有光的姿勢約四分之一的機會出現，不要太常蓋過反思的句子
+  const wantLight = Math.random() < 0.25;
+  const pool = POSES.map((p, i) => i).filter(i => (POSES[i].dataset.light === "1") === wantLight && i !== poseNow);
+  const n = pool[Math.floor(Math.random() * pool.length)];
+  if (poseNow >= 0) POSES[poseNow].classList.remove("on");
+  POSES[n].classList.add("on");
+  poseNow = n;
+  const nowLight = POSES[n].dataset.light === "1";
+  if (nowLight !== lightOn) { lightOn = nowLight; tick(true); }
+}
+function schedulePose() {
+  const wait = 20000 + Math.random() * 160000; // 20 秒到 3 分鐘之間，不固定
+  poseTimer = setTimeout(() => { pickPose(); schedulePose(); }, wait);
+}
+function stopPoses() { clearTimeout(poseTimer); poseTimer = null; }
+function startPoses() { stopPoses(); pickPose(); schedulePose(); }
+
+function thoughtFor(elapsed) {
+  const slot = Math.floor(elapsed / SLOT);
+  if (elapsed >= DAY) return { slot, text: GENTLE[slot % GENTLE.length] };
+  return { slot, text: SENTENCES[slot % SENTENCES.length] };
+}
+
+function tick(force) {
+  if (document.hidden && !force) return;
+  const start = getStart();
+  if (!start) return;
+  const elapsed = Date.now() - start;
+  $("timer").textContent = "你已經進入井裡 " + fmt(elapsed);
+  if (cloudOn() && Date.now() - lastPing > 6 * 3600 * 1000) cloudPing(start); // 開著不關也每 6 小時報到一次
+  const t = thoughtFor(elapsed);
+  const key = lightOn ? "L" : t.slot;
+  if (key !== lastSlot || force) {
+    lastSlot = key;
+    const el = $("thought");
+    el.textContent = lightOn ? LIGHT_LINE : t.text;
+    el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
+  }
+}
+
+document.addEventListener("visibilitychange", () => { if (!document.hidden && $("hole").classList.contains("active")) tick(true); });
+
+function say(msg) {
+  const r = $("reply");
+  r.textContent = msg; r.classList.add("show");
+  clearTimeout(replyTimer);
+  replyTimer = setTimeout(() => r.classList.remove("show"), 4000);
+}
+
+function stay() { say("那就再待一會兒吧。"); }
+
+function leave() {
+  const start = getStart() || Date.now();
+  const elapsed = Date.now() - start;
+  cloudLeave();
+  clear(); memStart = null; lastSlot = -2; lightOn = false;
+  clearInterval(tickId); tickId = null;
+  stopPoses();
+  setSound(false);
+  show("leave");
+  const btn = $("againBtn");
+  btn.classList.remove("show");
+  typeLines($("leaveText"), ["你已經在井裡待了\n" + fmt(elapsed), "你可能還沒找到自己，\n但是沒關係…"], { speed: 150, pause: 1400 })
+    .then(ok => { if (ok) setTimeout(() => btn.classList.add("show"), 600); });
+}
+
+$("yBtn").addEventListener("click", leave);
+$("nBtn").addEventListener("click", stay);
+document.addEventListener("keydown", e => {
+  if (othersOpen) { if (e.key === "Escape") closeOthers(); return; } // 看別人時，Y/N 不作用
+  if (!$("hole").classList.contains("active")) return;
+  const k = e.key.toLowerCase();
+  if (k === "y") leave();
+  else if (k === "n") stay();
+});
+
+/* ============ 環境聲：預設關閉，用程式即時產生（不需音檔） ============
+   遠處的水滴（間隔隨機、帶回音）＋ 很輕的低沉風聲 */
+let actx = null, master = null, dropBus = null, dropTimer = null, soundOn = false;
+
+function makeImpulse(ctx, sec, decay) {
+  const len = Math.floor(ctx.sampleRate * sec);
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+  }
+  return buf;
+}
+
+function initAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return false;
+  actx = new AC();
+  master = actx.createGain(); master.gain.value = 0; master.connect(actx.destination);
+
+  // 回音（井壁的殘響）
+  const conv = actx.createConvolver(); conv.buffer = makeImpulse(actx, 3.4, 2.4);
+  const wet = actx.createGain(); wet.gain.value = 0.9;
+  conv.connect(wet); wet.connect(master);
+  dropBus = actx.createGain();
+  const dry = actx.createGain(); dry.gain.value = 0.25;
+  dropBus.connect(dry); dry.connect(master); dropBus.connect(conv);
+
+  // 低沉風聲：布朗噪音 → 低通，音量緩慢起伏
+  const len = actx.sampleRate * 8;
+  const nb = actx.createBuffer(1, len, actx.sampleRate);
+  const d = nb.getChannelData(0); let last = 0;
+  for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; }
+  const src = actx.createBufferSource(); src.buffer = nb; src.loop = true;
+  const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 220;
+  const wg = actx.createGain(); wg.gain.value = 0.05;
+  const lfo = actx.createOscillator(); lfo.frequency.value = 0.07;
+  const lg = actx.createGain(); lg.gain.value = 0.02;
+  lfo.connect(lg); lg.connect(wg.gain);
+  src.connect(lp); lp.connect(wg); wg.connect(master);
+  src.start(); lfo.start();
+  return true;
+}
+
+function drop() {
+  if (!actx || !soundOn) return;
+  const t = actx.currentTime;
+  const f0 = 650 + Math.random() * 900;
+  const o = actx.createOscillator(); o.type = "sine";
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(f0 * 1.7, t + 0.09);
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.22, t + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+  o.connect(g); g.connect(dropBus);
+  o.start(t); o.stop(t + 0.35);
+}
+
+function scheduleDrop() {
+  clearTimeout(dropTimer);
+  const wait = 8000 + Math.random() * 40000; // 8～48 秒才滴一次，不規律
+  dropTimer = setTimeout(() => { drop(); scheduleDrop(); }, wait);
+}
+
+function setSound(on) {
+  const b = $("snd");
+  if (on) {
+    if (!actx && !initAudio()) { say("這個瀏覽器不支援聲音。"); return; }
+    if (actx.resume) actx.resume();
+    soundOn = true;
+    master.gain.setTargetAtTime(0.8, actx.currentTime, 1.5);
+    setTimeout(drop, 3000);
+    scheduleDrop();
+  } else {
+    soundOn = false;
+    clearTimeout(dropTimer);
+    if (master && actx) master.gain.setTargetAtTime(0, actx.currentTime, 0.6);
+  }
+  b.textContent = "聲音：" + (soundOn ? "開" : "關");
+  b.classList.toggle("on", soundOn);
+}
+
+$("snd").addEventListener("click", () => setSound(!soundOn));
+// 分頁在背景時暫停聲音處理，省電
+document.addEventListener("visibilitychange", () => {
+  if (!actx) return;
+  if (document.hidden) actx.suspend();
+  else if (soundOn) actx.resume();
+});
+
+/* ============ 雲端（Firebase）：記錄「誰在井裡」============
+   ★ 設定放這裡：把 Memorama 專案（memorma-24dab）的 firebaseConfig 貼進來。
+   apiKey 還是空的時候，所有雲端功能都關著，遊戲和以前完全一樣。
+   網址後面加 ?demo=47 可以不連 Firebase，先預覽「看看誰也在井裡」的樣子（47 是假的人數）。 */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC_YSDn2OH6_GKKwCq0d8QFNl3fYXzTC60",
+  authDomain: "memorma-24dab.firebaseapp.com",
+  projectId: "memorma-24dab",
+  storageBucket: "memorma-24dab.firebasestorage.app",
+  messagingSenderId: "806709458465",
+  appId: "1:806709458465:web:f0d12acb2f911f2f165560",
+  measurementId: "G-RS1DJ7DH50"
+};
+const CLOUD = {
+  collection: "well_visitors", // 資料夾名稱（只放「誰在井裡」）
+  expireDays: 30,              // 超過幾天沒出現，就不再算在井裡
+  maxTiles: 30,                // 最多顯示幾個方塊，其餘用文字說明
+  sdk: "10.12.2"
+};
+const DEMO = Number(new URLSearchParams(location.search).get("demo")) || 0;
+
+function cloudOn() { return !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId); }
+
+let cloudP = null, lastPing = 0;
+function getCloud() {
+  if (!cloudOn() || DEMO) return Promise.resolve(null);
+  if (cloudP) return cloudP;
+  cloudP = (async () => {
+    const base = "https://www.gstatic.com/firebasejs/" + CLOUD.sdk + "/";
+    const [appM, authM, fs] = await Promise.all([
+      import(base + "firebase-app.js"), import(base + "firebase-auth.js"), import(base + "firebase-firestore.js")
+    ]);
+    const app = appM.initializeApp(FIREBASE_CONFIG);
+    const auth = authM.getAuth(app);
+    await new Promise(res => { const un = authM.onAuthStateChanged(auth, () => { un(); res(); }); });
+    if (!auth.currentUser) await authM.signInAnonymously(auth); // 匿名：不問名字、不記 IP
+    return { db: fs.getFirestore(app), uid: auth.currentUser.uid, fs };
+  })().catch(e => { console.warn("well cloud", e); cloudP = null; return null; });
+  return cloudP;
+}
+
+/* 進井／再訪／每 6 小時：記下「這個人還在井裡」，永遠不會丟出錯誤 */
+function cloudPing(startMs) {
+  if (!cloudOn() || DEMO) return Promise.resolve();
+  lastPing = Date.now();
+  return getCloud().then(c => {
+    if (!c) return;
+    const { doc, setDoc, Timestamp, serverTimestamp } = c.fs;
+    return setDoc(doc(c.db, CLOUD.collection, c.uid), { enteredAt: Timestamp.fromMillis(startMs), lastSeen: serverTimestamp() });
+  }).catch(e => console.warn("well ping", e));
+}
+/* 按 Y 離開：把自己的那一筆刪掉 */
+function cloudLeave() {
+  if (!cloudOn() || DEMO) return Promise.resolve();
+  return getCloud().then(c => {
+    if (!c) return;
+    return c.fs.deleteDoc(c.fs.doc(c.db, CLOUD.collection, c.uid));
+  }).catch(e => console.warn("well leave", e));
+}
+/* 讀：總人數＋最近出現的前 maxTiles 個（只在打開畫面時讀一次，省額度） */
+async function cloudFetch() {
+  if (DEMO) {
+    const n = Math.min(DEMO, CLOUD.maxTiles);
+    return { total: DEMO, ids: Array.from({ length: n }, (_, i) => "demo" + i), me: "demo0" };
+  }
+  const c = await getCloud();
+  if (!c) throw new Error("no cloud");
+  const { collection, query, where, orderBy, limit, getDocs, getCountFromServer, Timestamp } = c.fs;
+  const cutoff = Timestamp.fromMillis(Date.now() - CLOUD.expireDays * DAY);
+  const base = collection(c.db, CLOUD.collection);
+  const [snap, cnt] = await Promise.all([
+    getDocs(query(base, where("lastSeen", ">=", cutoff), orderBy("lastSeen", "desc"), limit(CLOUD.maxTiles))),
+    getCountFromServer(query(base, where("lastSeen", ">=", cutoff)))
+  ]);
+  return { total: cnt.data().count, ids: snap.docs.map(d => d.id), me: c.uid };
+}
+
+/* ============ 看看誰也在井裡 ============ */
+const SVGNS = "http://www.w3.org/2000/svg";
+let othersOpen = false, tileTimers = [];
+
+/* 背景：固定的一堆模糊方塊（只是氣氛，不是真的人） */
+function buildBackdrop() {
+  const bg = $("bgSq");
+  bg.textContent = "";
+  const W = window.innerWidth, H = window.innerHeight;
+  for (let i = 0; i < 70; i++) {
+    const s = 36 + Math.random() * 80;
+    const el = document.createElement("i");
+    el.style.width = el.style.height = s + "px";
+    el.style.left = (Math.random() * (W + s) - s * 0.5) + "px";
+    el.style.top = (Math.random() * (H + s) - s * 0.5) + "px";
+    el.style.opacity = (0.3 + Math.random() * 0.45).toFixed(2);
+    el.style.filter = "blur(" + (3 + Math.random() * 6).toFixed(1) + "px)";
+    bg.appendChild(el);
+  }
+}
+
+/* 方塊：用目前井裡的姿勢圖，做成一個正方形的小畫面 */
+function makeTileSvg() {
+  const src = $("art");
+  const svg = document.createElementNS(SVGNS, "svg");
+  svg.setAttribute("viewBox", "80 50 260 260"); // 裁成正方形，姿勢放大一點
+  svg.setAttribute("aria-hidden", "true");
+  [...src.children].forEach(ch => {
+    const tag = ch.tagName.toLowerCase();
+    const isPose = ch.classList.contains("pose");
+    if (tag === "rect" || tag === "ellipse" || isPose) {
+      const c = ch.cloneNode(true);
+      c.removeAttribute("id");
+      if (isPose) c.classList.remove("on");
+      svg.appendChild(c);
+    }
+  });
+  return svg;
+}
+
+/* 不整齊的排列：隨機位置、互不重疊；放不下就把方塊縮小一點再試 */
+function placeTiles(n, W, H) {
+  if (n <= 0 || W <= 0 || H <= 0) return { s: 0, pts: [] };
+  let s = Math.min(150, Math.sqrt(W * H * 0.30 / Math.max(n, 6)));
+  for (let round = 0; round < 60; round++) {
+    const gap = s * 0.18, pts = [];
+    let ok = true;
+    for (let i = 0; i < n && ok; i++) {
+      let placed = false;
+      for (let t = 0; t < 300; t++) {
+        const x = Math.random() * Math.max(0, W - s), y = Math.random() * Math.max(0, H - s);
+        if (pts.every(p => Math.abs(p.x - x) >= s + gap || Math.abs(p.y - y) >= s + gap)) { pts.push({ x, y }); placed = true; break; }
+      }
+      if (!placed) ok = false;
+    }
+    if (ok) return { s, pts };
+    s *= 0.93;
+  }
+  return { s: 0, pts: [] };
+}
+
+function pickTilePose(poses, cur) {
+  const all = poses.map((p, i) => i).filter(i => i !== cur);
+  const wantLight = Math.random() < 0.25;
+  let pool = all.filter(i => (poses[i].dataset.light === "1") === wantLight);
+  if (!pool.length) pool = all;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function runTile(k, el) {
+  const poses = [...el.querySelectorAll(".pose")];
+  let cur = -1;
+  const step = () => {
+    const n = pickTilePose(poses, cur);
+    if (cur >= 0) poses[cur].classList.remove("on");
+    poses[n].classList.add("on");
+    cur = n;
+    tileTimers[k] = setTimeout(step, 8000 + Math.random() * 32000); // 各自不定時更換
+  };
+  setTimeout(step, Math.random() * 1500);
+}
+
+function renderOthers(d) {
+  const total = Math.max(d.total || 0, d.ids.length);
+  $("othersCount").textContent = total <= 1 ? "井裡現在只有你" : "井裡現在有 " + total + " 個人";
+  const deep = total - d.ids.length;
+  $("othersDeep").textContent = deep > 0 ? "還有 " + deep + " 個人在更深的地方" : "";
+  const box = $("tiles");
+  box.textContent = "";
+  const { s, pts } = placeTiles(d.ids.length, box.clientWidth, box.clientHeight);
+  if (!s) return;
+  d.ids.forEach((id, k) => {
+    const el = document.createElement("div");
+    el.className = "tile" + (id === d.me ? " me" : "");
+    el.style.width = el.style.height = s + "px";
+    el.style.left = pts[k].x + "px";
+    el.style.top = pts[k].y + "px";
+    el.appendChild(makeTileSvg());
+    box.appendChild(el);
+    runTile(k, el);
+  });
+}
+
+async function openOthers() {
+  othersOpen = true;
+  $("others").classList.add("open");
+  $("othersCount").textContent = "…";
+  $("othersDeep").textContent = "";
+  $("tiles").textContent = "";
+  buildBackdrop();
+  try {
+    const start = getStart();
+    if (start) await cloudPing(start); // 先報到，這樣自己一定在名單裡
+    const d = await cloudFetch();
+    if (othersOpen) renderOthers(d);
+  } catch (e) {
+    console.warn("well others", e);
+    if (othersOpen) $("othersCount").textContent = "現在看不到井裡的人。";
+  }
+}
+function closeOthers() {
+  othersOpen = false;
+  $("others").classList.remove("open");
+  tileTimers.forEach(t => clearTimeout(t));
+  tileTimers = [];
+  $("tiles").textContent = "";
+}
+
+$("seeBtn").addEventListener("click", openOthers);
+$("backBtn").addEventListener("click", closeOthers);
+if (cloudOn() || DEMO) {
+  $("seeBtn").hidden = false;
+  $("careCloud").textContent = "這裡只會記錄井裡有幾個人，不記名字。";
+}
+
+/* ============ 啟動 ============ */
+if (getStart()) enterHole(); else showIntro();
+</script>
+</body>
+</html>
