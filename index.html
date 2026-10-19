@@ -481,7 +481,7 @@ function tick(force) {
   if (!start) return;
   const elapsed = Date.now() - start;
   $("timer").textContent = "你已經進入井裡 " + fmt(elapsed);
-  if (cloudOn() && Date.now() - lastPing > 6 * 3600 * 1000) cloudPing(start); // 開著不關也每 6 小時報到一次
+  if (cloudOn() && Date.now() - lastPing > 7 * DAY) cloudPing(start); // 開著不關也每 7 天報到一次（要小於 expireDays）
   const t = thoughtFor(elapsed);
   const key = lightOn ? "L" : t.slot;
   if (key !== lastSlot || force) {
@@ -660,7 +660,7 @@ function getCloud() {
   return cloudP;
 }
 
-/* 進井／再訪／每 6 小時：記下「這個人還在井裡」，永遠不會丟出錯誤 */
+/* 進井／再訪／每 7 天：記下「這個人還在井裡」，永遠不會丟出錯誤 */
 function cloudPing(startMs) {
   if (!cloudOn() || DEMO) return Promise.resolve();
   lastPing = Date.now();
