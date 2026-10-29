@@ -1,4 +1,4 @@
-# 井
+# 井 · El pozo
 
 > 一個安靜的網頁小遊戲：進到井裡，計算你待了多久，沒有關卡、沒有輸贏
 
@@ -35,3 +35,10 @@
 ## 技術
 - 單一檔案 `index.html`（無需建置），畫面為 SVG／CSS，Firebase SDK 由 gstatic 載入。
 - 部署：GitHub Pages。
+
+## 檔案結構
+- `index.html`：整個遊戲（單一檔案）。
+- `og.jpg`：分享連結預覽的縮圖（1200x630）。
+
+## 分享連結預覽（2026-10-28）
+把網址貼到 LINE、WhatsApp 時，會顯示遊戲名稱「井 · El pozo」和縮圖 `og.jpg`；名稱與說明文字寫在 `index.html` `<head>` 的 `og:title`、`og:description`。
