@@ -42,3 +42,12 @@
 
 ## 分享連結預覽（2026-10-28）
 把網址貼到 LINE、WhatsApp 時，會顯示遊戲名稱「井 · El pozo」和縮圖 `og.jpg`；名稱與說明文字寫在 `index.html` `<head>` 的 `og:title`、`og:description`。
+
+## 測試
+
+`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers python3 tests/test_well.py`（Python + Playwright；擋掉外部網路，用假的 Firebase 和假的語音，不碰真的資料庫）
+
+- 目前 47 項檢查（2026-10-30 建立）。
+- 涵蓋：介紹→進入、計時關網頁再開接著算、Y／N 鍵、離開歸零並刪雲端紀錄、句子槽位、存檔壞掉時的退路、沒有 Firebase、`?demo=`。
+- 改了遊戲的計分、設定、排行榜或畫面文字後，推上去之前先跑一次。
+- 驗證方式：另外複製一份遊戲、故意改壞一個地方，測試會出現 FAIL。
